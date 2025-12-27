@@ -48,7 +48,10 @@ export class NukeExecution implements Execution {
     });
   }
 
-  public target(): Player | TerraNullius {
+  public target(): Player | TerraNullius | null {
+    // Not initialized yet -> queued execution
+    if (!this.mg) return null;
+
     return this.mg.owner(this.dst);
   }
 
@@ -68,6 +71,25 @@ export class NukeExecution implements Execution {
       return d2 <= outer2 && (d2 <= inner2 || rand.chance(2));
     });
     return this.tilesToDestroyCache;
+  }
+
+  public targetTile(): TileRef {
+    return this.dst;
+  }
+
+  public isInFlight(): boolean {
+    return this.nuke !== null;
+  }
+
+  public destroyInFlight(): void {
+    if (!this.active) return;
+
+    if (this.nuke) {
+      this.nuke.delete(false);
+      this.nuke = null;
+    }
+
+    this.active = false;
   }
 
   /**
@@ -246,12 +268,12 @@ export class NukeExecution implements Execution {
       throw new Error("Not initialized");
     }
 
+    const target = this.target();
     const magnitude = this.mg.config().nukeMagnitudes(this.nuke.type());
     const toDestroy = this.tilesToDestroy();
 
-    const maxTroops = this.target().isPlayer()
-      ? this.mg.config().maxTroops(this.target() as Player)
-      : 1;
+    const maxTroops =
+      target && target.isPlayer() ? this.mg.config().maxTroops(target) : 1;
 
     for (const tile of toDestroy) {
       const owner = this.mg.owner(tile);
@@ -318,9 +340,11 @@ export class NukeExecution implements Execution {
     this.nuke.delete(false);
 
     // Record stats
-    this.mg
-      .stats()
-      .bombLand(this.player, this.target(), this.nuke.type() as NukeType);
+    if (target) {
+      this.mg
+        .stats()
+        .bombLand(this.player, target, this.nuke.type() as NukeType);
+    }
   }
 
   private redrawBuildings(range: number) {
