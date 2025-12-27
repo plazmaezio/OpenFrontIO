@@ -767,6 +767,16 @@ export interface Game extends GameMap {
   addUpdate(update: GameUpdate): void;
   railNetwork(): RailNetwork;
   conquerPlayer(conqueror: Player, conquered: Player): void;
+
+  destroyNukesBetween(
+    p1: Player,
+    p2: Player,
+  ): {
+    inFlight: number;
+    queued: number;
+  };
+
+  executions(): Execution[];
 }
 
 export interface PlayerActions {
