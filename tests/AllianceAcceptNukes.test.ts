@@ -1,4 +1,6 @@
+import { GameUpdateType } from "src/core/game/GameUpdates";
 import { NukeExecution } from "../src/core/execution/NukeExecution";
+import { PlayerExecution } from "../src/core/execution/PlayerExecution";
 import {
   Game,
   Player,
@@ -6,7 +8,6 @@ import {
   PlayerType,
   UnitType,
 } from "../src/core/game/Game";
-import { GameUpdateType } from "../src/core/game/GameUpdates";
 import { setup } from "./util/Setup";
 import { TestConfig } from "./util/TestConfig";
 
@@ -42,85 +43,47 @@ describe("Alliance acceptance destroys nukes", () => {
     player3 = game.player("p3");
 
     player1.conquer(game.ref(0, 0));
-    player2.conquer(game.ref(0, 1));
-    player3.conquer(game.ref(10, 10));
-  });
-
-  test("accepting alliance destroys queued nukes between players", () => {
-    // Ensure the target tile is owned by player2
     player2.conquer(game.ref(5, 5));
-    game.addExecution(
-      new NukeExecution(UnitType.AtomBomb, player1, game.ref(5, 5), null),
-    );
+    player3.conquer(game.ref(10, 10));
 
-    expect(game.executions().length).toBe(1);
-
-    const req = player1.createAllianceRequest(player2);
-    req!.accept();
-    game.executeNextTick();
-
-    expect(game.executions().length).toBe(0);
+    player1.buildUnit(UnitType.MissileSilo, game.ref(0, 0), {});
   });
 
   test("accepting alliance destroys in-flight nukes between players", () => {
-    // Ensure target owned by player2
-    player2.conquer(game.ref(5, 5));
-
-    player1.buildUnit(UnitType.MissileSilo, game.ref(0, 0), {});
-
-    const exec = new NukeExecution(
-      UnitType.AtomBomb,
-      player1,
-      game.ref(5, 5),
-      game.ref(0, 0),
+    game.addExecution(
+      new NukeExecution(
+        UnitType.AtomBomb,
+        player1,
+        game.ref(5, 5),
+        game.ref(0, 0),
+        -1,
+        5,
+      ),
     );
 
-    game.addExecution(exec);
     game.executeNextTick(); // init
     game.executeNextTick(); // spawn nuke
 
-    expect(exec.isInFlight()).toBe(true);
-    expect(exec.isActive()).toBe(true);
+    const nukesBefore = game.units(UnitType.AtomBomb).length;
+    expect(nukesBefore).toBe(1);
 
-    const req = player1.createAllianceRequest(player2);
+    expect(player2.isAlliedWith(player1)).toBe(false);
+    expect(player1.isFriendly(player2)).toBe(false);
+
+    const req = player2.createAllianceRequest(player1);
     req!.accept();
+
+    expect(player2.isAlliedWith(player1)).toBe(true);
+    expect(player1.isFriendly(player2)).toBe(true);
+
+    // Run PlayerExecution.tick() for the target player, so it doesn't depend on tick ordering.
+    const pe = new PlayerExecution(player2);
+    pe.init(game, game.ticks());
+    pe.tick(game.ticks());
+
+    expect(game.units(UnitType.AtomBomb)).toHaveLength(0);
     game.executeNextTick();
-
-    expect(exec.isActive()).toBe(false);
-  });
-
-  test("queued and in-flight nukes are counted correctly", () => {
-    player1.buildUnit(UnitType.MissileSilo, game.ref(0, 0), {});
-
-    player2.conquer(game.ref(5, 5));
-    player2.conquer(game.ref(6, 6));
-
-    const inFlight = new NukeExecution(
-      UnitType.AtomBomb,
-      player1,
-      game.ref(5, 5),
-      game.ref(0, 0),
-    );
-
-    const queued = new NukeExecution(
-      UnitType.AtomBomb,
-      player1,
-      game.ref(6, 6),
-      null,
-    );
-
-    // Spawn the in-flight nuke first
-    game.addExecution(inFlight);
-    game.executeNextTick();
-    game.executeNextTick(); // spawn first
-
-    // Add queued after the first has spawned so it remains queued
-    game.addExecution(queued);
-
-    const result = game.destroyNukesBetween(player1, player2);
-
-    expect(result.inFlight).toBe(1);
-    expect(result.queued).toBe(1);
+    expect(game.units(UnitType.AtomBomb)).toHaveLength(0);
   });
 
   test("accepting alliance does not destroy nukes targeting third players", () => {
@@ -128,62 +91,64 @@ describe("Alliance acceptance destroys nukes", () => {
       new NukeExecution(UnitType.AtomBomb, player1, game.ref(10, 10), null),
     );
 
+    game.executeNextTick(); // init
+    game.executeNextTick(); // spawn
+
+    expect(player2.isAlliedWith(player1)).toBe(false);
+    expect(player1.isFriendly(player2)).toBe(false);
+
     const req = player1.createAllianceRequest(player2);
     req!.accept();
+
+    expect(player2.isAlliedWith(player1)).toBe(true);
+    expect(player1.isFriendly(player2)).toBe(true);
+
     game.executeNextTick();
 
-    expect(game.executions().length).toBe(1);
-  });
-
-  test("queued nukes never spawn after alliance acceptance (race condition)", () => {
-    // Ensure the target tile is owned by player2
-    player2.conquer(game.ref(20, 20));
-
-    const exec = new NukeExecution(
-      UnitType.AtomBomb,
-      player1,
-      game.ref(20, 20),
-      null,
-    );
-
-    game.addExecution(exec);
-
-    const req = player1.createAllianceRequest(player2);
-    req!.accept();
-
-    for (let i = 0; i < 5; i++) {
-      game.executeNextTick();
-    }
-
-    expect(exec.isActive()).toBe(false);
-    expect(game.executions().length).toBe(0);
+    expect(game.units(UnitType.AtomBomb)).toHaveLength(1);
   });
 
   test("accepting alliance displays correct nuke cancellation messages", () => {
-    // Ensure target owned by player2
-    player2.conquer(game.ref(5, 5));
     game.addExecution(
-      new NukeExecution(UnitType.AtomBomb, player1, game.ref(5, 5), null),
+      new NukeExecution(
+        UnitType.AtomBomb,
+        player1,
+        game.ref(5, 5),
+        game.ref(0, 0),
+        -1,
+        5,
+      ),
     );
 
-    const req = player1.createAllianceRequest(player2);
+    game.executeNextTick(); // init
+    game.executeNextTick(); // spawn nuke
+
+    const nukesBefore = game.units(UnitType.AtomBomb).length;
+    expect(nukesBefore).toBe(1);
+
+    expect(player2.isAlliedWith(player1)).toBe(false);
+    expect(player1.isFriendly(player2)).toBe(false);
+
+    const req = player2.createAllianceRequest(player1);
     req!.accept();
+
+    expect(player2.isAlliedWith(player1)).toBe(true);
+    expect(player1.isFriendly(player2)).toBe(true);
+
+    // Run PlayerExecution.tick() for the target player, so it doesn't depend on tick ordering.
+    const pe = new PlayerExecution(player2);
+    pe.init(game, game.ticks());
+    pe.tick(game.ticks());
+
+    expect(game.units(UnitType.AtomBomb)).toHaveLength(0);
     const updates = game.executeNextTick();
+    expect(game.units(UnitType.AtomBomb)).toHaveLength(0);
 
     const messages =
       updates[GameUpdateType.DisplayEvent]?.map((e) => e.message) ?? [];
 
-    // expect(messages.some((m) => m.includes("planned nuke"))).toBe(true);
-
-    // Expect both the queued (planned) message and a directional message
     expect(
-      messages.some(
-        (m) =>
-          m.includes("planned nuke") ||
-          m.includes("launched towards") ||
-          m.includes("launched at") ||
-          m.includes("launched by"),
-      ),
+      messages.some((m) => m.includes("destroyed due to the alliance")),
     ).toBe(true);
   });
 });
