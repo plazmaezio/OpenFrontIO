@@ -330,7 +330,7 @@ export class GameImpl implements Game {
     if (recipient.hasEmbargoAgainst(requestor))
       recipient.endTemporaryEmbargo(requestor);
 
-    // Destroy counts available for display messages
+    // Remove inactive executions from the queue before next tick
     this.unInitExecs = this.unInitExecs.filter((e) => e.isActive());
 
     this.addUpdate({
