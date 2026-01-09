@@ -1,5 +1,5 @@
 import { Config } from "../configuration/Config";
-import { Execution, Game, MessageType, Player, UnitType } from "../game/Game";
+import { Execution, Game, Player, UnitType } from "../game/Game";
 import { TileRef } from "../game/GameMap";
 import { calculateBoundingBox, getMode, inscribed, simpleHash } from "../Util";
 
@@ -34,55 +34,6 @@ export class PlayerExecution implements Execution {
 
   tick(ticks: number) {
     this.player.decayRelations();
-
-    // Neutralize incoming nukes launched by friendly players
-    const neutralizedByPlayer = new Map<Player, number>();
-    for (const unit of this.mg.units(
-      UnitType.AtomBomb,
-      UnitType.HydrogenBomb,
-    )) {
-      if (!unit.isActive() || unit.reachedTarget()) continue;
-
-      const targetTile = unit.targetTile();
-      if (targetTile === undefined) continue;
-
-      const targetOwner = this.mg.owner(targetTile);
-      if (targetOwner !== this.player) continue;
-
-      const launcher = unit.owner();
-      if (launcher === this.player) continue;
-
-      if (launcher.isFriendly(this.player)) {
-        unit.delete(false);
-
-        neutralizedByPlayer.set(
-          launcher,
-          (neutralizedByPlayer.get(launcher) ?? 0) + 1,
-        );
-      }
-    }
-
-    for (const [launcher, count] of neutralizedByPlayer) {
-      if (!count) continue;
-
-      // Message for me
-      this.mg.displayMessage(
-        `${count} nuke${count > 1 ? "s" : ""} launched by ${launcher.displayName()} toward you ${
-          count > 1 ? "were" : "was"
-        } destroyed due to the alliance`,
-        MessageType.ALLIANCE_ACCEPTED,
-        this.player.id(),
-      );
-
-      // Message for the launcher
-      this.mg.displayMessage(
-        `${count} nuke${count > 1 ? "s" : ""} launched toward ${this.player.displayName()} ${
-          count > 1 ? "were" : "was"
-        } destroyed due to the alliance`,
-        MessageType.ALLIANCE_ACCEPTED,
-        launcher.id(),
-      );
-    }
 
     for (const u of this.player.units()) {
       if (!u.info().territoryBound) {

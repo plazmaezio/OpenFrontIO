@@ -296,6 +296,52 @@ export class GameImpl implements Game {
     return ar;
   }
 
+  private cancelNukesBetweenAlliedPlayers(p1: Player, p2: Player): void {
+    const neutralized = new Map<Player, number>();
+
+    for (const unit of this.units(UnitType.AtomBomb, UnitType.HydrogenBomb)) {
+      if (!unit.isActive() || unit.reachedTarget()) continue;
+
+      const targetTile = unit.targetTile();
+      if (!targetTile) continue;
+
+      const targetOwner = this.owner(targetTile);
+      if (!targetOwner.isPlayer()) continue;
+
+      const launcher = unit.owner();
+
+      const isBetween =
+        (launcher === p1 && targetOwner === p2) ||
+        (launcher === p2 && targetOwner === p1);
+
+      if (!isBetween) continue;
+
+      unit.delete(false);
+
+      neutralized.set(launcher, (neutralized.get(launcher) ?? 0) + 1);
+    }
+
+    for (const [launcher, count] of neutralized) {
+      const other = launcher === p1 ? p2 : p1;
+
+      this.displayMessage(
+        `${count} nuke${count > 1 ? "s" : ""} launched toward ${other.displayName()} ${
+          count > 1 ? "were" : "was"
+        } destroyed due to the alliance`,
+        MessageType.ALLIANCE_ACCEPTED,
+        launcher.id(),
+      );
+
+      this.displayMessage(
+        `${count} nuke${count > 1 ? "s" : ""} launched by ${launcher.displayName()} ${
+          count > 1 ? "were" : "was"
+        } destroyed due to the alliance`,
+        MessageType.ALLIANCE_ACCEPTED,
+        other.id(),
+      );
+    }
+  }
+
   acceptAllianceRequest(request: AllianceRequestImpl) {
     this.allianceRequests = this.allianceRequests.filter(
       (ar) => ar !== request,
@@ -332,6 +378,9 @@ export class GameImpl implements Game {
 
     // Remove inactive executions from the queue before next tick
     this.unInitExecs = this.unInitExecs.filter((e) => e.isActive());
+
+    // Destroy any nukes in flight between the newly allied players
+    this.cancelNukesBetweenAlliedPlayers(requestor, recipient);
 
     this.addUpdate({
       type: GameUpdateType.AllianceRequestReply,
