@@ -1,4 +1,11 @@
-import { Execution, Game, Player, PlayerID } from "../../game/Game";
+import {
+  Execution,
+  Game,
+  MessageType,
+  Player,
+  PlayerID,
+  UnitType,
+} from "../../game/Game";
 
 export class AllianceRequestReplyExecution implements Execution {
   private active = true;
@@ -9,6 +16,55 @@ export class AllianceRequestReplyExecution implements Execution {
     private recipient: Player,
     private accept: boolean,
   ) {}
+
+  private cancelNukesBetweenAlliedPlayers(
+    mg: Game,
+    p1: Player,
+    p2: Player,
+  ): void {
+    const neutralized = new Map<Player, number>();
+
+    for (const unit of mg.units(UnitType.AtomBomb, UnitType.HydrogenBomb)) {
+      if (!unit.isActive() || unit.reachedTarget()) continue;
+
+      const targetTile = unit.targetTile();
+      if (!targetTile) continue;
+
+      const targetOwner = mg.owner(targetTile);
+      if (!targetOwner.isPlayer()) continue;
+
+      const launcher = unit.owner();
+      const isBetween =
+        (launcher === p1 && targetOwner === p2) ||
+        (launcher === p2 && targetOwner === p1);
+
+      if (!isBetween) continue;
+
+      unit.delete(false);
+
+      neutralized.set(launcher, (neutralized.get(launcher) ?? 0) + 1);
+    }
+
+    for (const [launcher, count] of neutralized) {
+      const other = launcher === p1 ? p2 : p1;
+
+      mg.displayMessage(
+        `${count} nuke${count > 1 ? "s" : ""} launched toward ${other.displayName()} ${
+          count > 1 ? "were" : "was"
+        } destroyed due to the alliance`,
+        MessageType.ALLIANCE_ACCEPTED,
+        launcher.id(),
+      );
+
+      mg.displayMessage(
+        `${count} nuke${count > 1 ? "s" : ""} launched by ${launcher.displayName()} ${
+          count > 1 ? "were" : "was"
+        } destroyed due to the alliance`,
+        MessageType.ALLIANCE_ACCEPTED,
+        other.id(),
+      );
+    }
+  }
 
   init(mg: Game, ticks: number): void {
     if (!mg.hasPlayer(this.requestorID)) {
@@ -33,6 +89,12 @@ export class AllianceRequestReplyExecution implements Execution {
           request.accept();
           this.requestor.updateRelation(this.recipient, 100);
           this.recipient.updateRelation(this.requestor, 100);
+
+          this.cancelNukesBetweenAlliedPlayers(
+            mg,
+            this.requestor,
+            this.recipient,
+          );
         } else {
           request.reject();
         }

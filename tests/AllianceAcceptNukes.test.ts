@@ -1,3 +1,4 @@
+import { AllianceRequestReplyExecution } from "src/core/execution/alliance/AllianceRequestReplyExecution";
 import { GameUpdateType } from "src/core/game/GameUpdates";
 import { NukeExecution } from "../src/core/execution/NukeExecution";
 import {
@@ -68,13 +69,15 @@ describe("Alliance acceptance immediately destroys in-flight nukes", () => {
     expect(player2.isAlliedWith(player1)).toBe(false);
     expect(player1.isFriendly(player2)).toBe(false);
 
-    const req = player2.createAllianceRequest(player1);
-    req!.accept();
+    player2.createAllianceRequest(player1);
+    game.addExecution(
+      new AllianceRequestReplyExecution(player2.id(), player1, true),
+    );
+
+    game.executeNextTick();
 
     expect(player2.isAlliedWith(player1)).toBe(true);
     expect(player1.isFriendly(player2)).toBe(true);
-
-    game.executeNextTick();
 
     expect(game.units(UnitType.AtomBomb)).toHaveLength(0);
   });
@@ -97,13 +100,16 @@ describe("Alliance acceptance immediately destroys in-flight nukes", () => {
     expect(player2.isAlliedWith(player1)).toBe(false);
     expect(player1.isFriendly(player2)).toBe(false);
 
-    const req = player1.createAllianceRequest(player2);
-    req!.accept();
+    player1.createAllianceRequest(player2);
+    game.addExecution(
+      new AllianceRequestReplyExecution(player1.id(), player2, true),
+    );
+
+    game.executeNextTick();
 
     expect(player2.isAlliedWith(player1)).toBe(true);
     expect(player1.isFriendly(player2)).toBe(true);
 
-    game.executeNextTick();
     expect(game.units(UnitType.AtomBomb)).toHaveLength(1);
 
     // Ensure remaining nuke targets player3
@@ -131,13 +137,15 @@ describe("Alliance acceptance immediately destroys in-flight nukes", () => {
     expect(player2.isAlliedWith(player1)).toBe(false);
     expect(player1.isFriendly(player2)).toBe(false);
 
-    const req = player2.createAllianceRequest(player1);
-    req!.accept();
+    player2.createAllianceRequest(player1);
+    game.addExecution(
+      new AllianceRequestReplyExecution(player2.id(), player1, true),
+    );
+
+    const updates = game.executeNextTick();
 
     expect(player2.isAlliedWith(player1)).toBe(true);
     expect(player1.isFriendly(player2)).toBe(true);
-
-    const updates = game.executeNextTick(); // get updates
 
     expect(game.units(UnitType.AtomBomb)).toHaveLength(0);
 
