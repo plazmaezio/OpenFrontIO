@@ -34,7 +34,6 @@ export class PlayerExecution implements Execution {
 
   tick(ticks: number) {
     this.player.decayRelations();
-
     for (const u of this.player.units()) {
       if (!u.info().territoryBound) {
         continue;
