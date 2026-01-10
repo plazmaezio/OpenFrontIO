@@ -24,25 +24,27 @@ export class AllianceRequestReplyExecution implements Execution {
   ): void {
     const neutralized = new Map<Player, number>();
 
-    for (const unit of mg.units(UnitType.AtomBomb, UnitType.HydrogenBomb)) {
-      if (!unit.isActive() || unit.reachedTarget()) continue;
+    const players = [p1, p2];
 
-      const targetTile = unit.targetTile();
-      if (!targetTile) continue;
+    for (const launcher of players) {
+      for (const unit of launcher.units(
+        UnitType.AtomBomb,
+        UnitType.HydrogenBomb,
+      )) {
+        if (!unit.isActive() || unit.reachedTarget()) continue;
 
-      const targetOwner = mg.owner(targetTile);
-      if (!targetOwner.isPlayer()) continue;
+        const targetTile = unit.targetTile();
+        if (!targetTile) continue;
 
-      const launcher = unit.owner();
-      const isBetween =
-        (launcher === p1 && targetOwner === p2) ||
-        (launcher === p2 && targetOwner === p1);
+        const targetOwner = mg.owner(targetTile);
+        if (!targetOwner.isPlayer()) continue;
 
-      if (!isBetween) continue;
+        const other = launcher === p1 ? p2 : p1;
+        if (targetOwner !== other) continue;
 
-      unit.delete(false);
-
-      neutralized.set(launcher, (neutralized.get(launcher) ?? 0) + 1);
+        unit.delete(false);
+        neutralized.set(launcher, (neutralized.get(launcher) ?? 0) + 1);
+      }
     }
 
     for (const [launcher, count] of neutralized) {
