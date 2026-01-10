@@ -153,7 +153,11 @@ describe("Alliance acceptance immediately destroys in-flight nukes", () => {
       updates[GameUpdateType.DisplayEvent]?.map((e) => e.message) ?? [];
 
     expect(
-      messages.some((m) => m.includes("destroyed due to the alliance")),
+      messages.some(
+        (m) =>
+          m === "events_display.alliance_nukes_destroyed_outgoing" ||
+          m === "events_display.alliance_nukes_destroyed_incoming",
+      ),
     ).toBe(true);
   });
 });

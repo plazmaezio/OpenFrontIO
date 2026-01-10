@@ -51,19 +51,19 @@ export class AllianceRequestReplyExecution implements Execution {
       const other = launcher === p1 ? p2 : p1;
 
       mg.displayMessage(
-        `${count} nuke${count > 1 ? "s" : ""} launched toward ${other.displayName()} ${
-          count > 1 ? "were" : "was"
-        } destroyed due to the alliance`,
+        "events_display.alliance_nukes_destroyed_outgoing",
         MessageType.ALLIANCE_ACCEPTED,
         launcher.id(),
+        undefined,
+        { name: other.displayName(), count },
       );
 
       mg.displayMessage(
-        `${count} nuke${count > 1 ? "s" : ""} launched by ${launcher.displayName()} ${
-          count > 1 ? "were" : "was"
-        } destroyed due to the alliance`,
+        "events_display.alliance_nukes_destroyed_incoming",
         MessageType.ALLIANCE_ACCEPTED,
         other.id(),
+        undefined,
+        { name: launcher.displayName(), count },
       );
     }
   }
