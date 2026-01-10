@@ -330,9 +330,6 @@ export class GameImpl implements Game {
     if (recipient.hasEmbargoAgainst(requestor))
       recipient.endTemporaryEmbargo(requestor);
 
-    // Remove inactive executions from the queue before next tick
-    this.unInitExecs = this.unInitExecs.filter((e) => e.isActive());
-
     this.addUpdate({
       type: GameUpdateType.AllianceRequestReply,
       request: request.toUpdate(),
@@ -379,7 +376,6 @@ export class GameImpl implements Game {
   }
 
   executeNextTick(): GameUpdates {
-    const pending = this.updates;
     this.updates = createGameUpdatesMap();
     this.execs.forEach((e) => {
       if (
@@ -416,15 +412,7 @@ export class GameImpl implements Game {
       });
     }
     this._ticks++;
-
-    const merged = createGameUpdatesMap();
-
-    for (const k in merged) {
-      merged[k] = [...pending[k], ...this.updates[k]];
-    }
-
-    this.updates = createGameUpdatesMap();
-    return merged;
+    return this.updates;
   }
 
   private hash(): number {
